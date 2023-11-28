@@ -32,9 +32,9 @@ def _test_exception_all_func(i):
     raise ValueError("legitimate exception from process %d" % i)
 
 
-def _test_terminate_signal_func(i):
+def _test_terminate_signal_func(i, signal=signal.SIGABRT):
     if i == 0:
-        os.kill(os.getpid(), signal.SIGABRT)
+        os.kill(os.getpid(), signal)
     time.sleep(1.0)
 
 
@@ -137,6 +137,25 @@ class _TestMultiProcessing:
 
         with self.assertRaisesRegex(Exception, message):
             mp.start_processes(_test_terminate_signal_func, nprocs=2, start_method=self.start_method)
+
+    def test_unknown_signal(self):
+        # SIGABRT is aliased with SIGIOT
+        message = r"process 0 terminated with signal <Unknown signal \d+>"
+
+        if IS_WINDOWS:
+            message = r"process 0 terminated with exit code \d+"
+
+        # Find and usean unnamed realtime signal to trigger the
+        # unnamed signal code path.  Start at a known signal and march
+        # until we find one.
+        for bad_signal in range(int(signal.SIGINT), 256):
+            try:
+                signal.Signals(bad_signal)
+            except ValueError:
+                break
+
+        with self.assertRaisesRegex(Exception, message):
+            mp.start_processes(_test_terminate_signal_func, args=(bad_signal,), nprocs=2, start_method=self.start_method)
 
     def test_terminate_exit(self):
         exitcode = 123
