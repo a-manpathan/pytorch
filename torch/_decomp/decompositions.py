@@ -4026,6 +4026,37 @@ def upsample_bicubic2d_vec(
 @pw_cast_for_opmath
 @out_wrapper()
 def _reflection_pad(a: Tensor, padding: Tuple[int, ...]) -> Tensor:
+    return _reflection_or_replication_pad(
+        a,
+        padding,
+        lambda pad: torch.arange(pad, 0, step=-1, device=a.device),
+        lambda pad, length: torch.arange(
+            length - 2, length - 2 - pad, step=-1, device=a.device
+        ),
+    )
+
+
+@register_decomposition(aten.replication_pad1d)
+@register_decomposition(aten.replication_pad2d)
+@register_decomposition(aten.replication_pad3d)
+@pw_cast_for_opmath
+@out_wrapper()
+def _replication_pad(a: Tensor, padding: Tuple[int, ...]) -> Tensor:
+    return _reflection_or_replication_pad(
+        a,
+        padding,
+        lambda pad: torch.zeros(pad, device=a.device, dtype=torch.int64),
+        lambda pad, length: torch.ones(pad, device=a.device, dtype=torch.int64)
+        * (length - 1),
+    )
+
+
+def _reflection_or_replication_pad(
+    a: Tensor,
+    padding: Tuple[int, ...],
+    left_fn: Callable[[int], Tensor],
+    right_fn: Callable[[int, int], Tensor],
+) -> Tensor:
     dim = len(padding) // 2
     torch._check(
         a.dim() in (dim + 1, dim + 2),
@@ -4044,19 +4075,15 @@ def _reflection_pad(a: Tensor, padding: Tuple[int, ...]) -> Tensor:
             middle = middle[-padding_left[i] :]
             to_cat = [middle]
         else:
-            left = torch.arange(padding_left[i], 0, step=-1, device=a.device)
+            left = left_fn(padding_left[i])
             to_cat = [left, middle]
 
         if padding_right[i] < 0:
             middle = middle[: -padding_right[i]]
         else:
-            right = torch.arange(
-                inp_shape[i] - 2,
-                inp_shape[i] - 2 - padding_right[i],
-                step=-1,
-                device=a.device,
-            )
+            right = right_fn(padding_right[i], inp_shape[i])
             to_cat.append(right)
+
         idx: List[Any] = [slice(s) for s in result.shape]
         idx[i + nc_dim] = torch.cat(tuple(to_cat))
         result = result[idx]
