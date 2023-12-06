@@ -3706,8 +3706,6 @@ class NCCLTraceTestDumpOnTimeout(NCCLTraceTestBase):
     timeout_sec = 1
 
     def setUp(self):
-        os.environ["TORCH_NCCL_DUMP_ON_TIMEOUT"] = '1'
-        os.environ["TORCH_NCCL_TRACE_BUFFER_SIZE"] = '10'
         self.tempdir = tempfile.TemporaryDirectory()
         # will be cleaned up (reliably?) on gc?
         os.environ["TORCH_NCCL_DEBUG_INFO_TEMP_FILE"] = self._trace_basename()
