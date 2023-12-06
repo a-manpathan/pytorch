@@ -115,6 +115,8 @@ if is_available():
 
     from .remote_device import _remote_device
 
+    from .device_mesh import init_device_mesh, DeviceMesh
+
     set_debug_level_from_env()
 
 else:
@@ -127,3 +129,8 @@ else:
     class _ProcessGroupStub:
         pass
     sys.modules["torch.distributed"].ProcessGroup = _ProcessGroupStub  # type: ignore[attr-defined]
+
+    class _DeviceMeshModuleStub:
+        pass
+
+    sys.modules["torch.distributed"].device_mesh = _DeviceMeshModuleStub  # type: ignore[attr-defined]
